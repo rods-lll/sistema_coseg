@@ -1,0 +1,12 @@
+{
+  "solicitante": "Maria Silva",
+  "setor": "Operações",
+  "atividade": "Reunião externa",
+  "origem": "Porto do Itaqui",
+  "destino": "Centro",
+  "data": "2026-12-15",
+  "saida": "08:00",
+  "retorno": "10:00",
+  "passageiros": 3,
+  "veiculo": "VL-01"
+}

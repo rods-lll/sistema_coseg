@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>COSEG Mobilidade — Painel de reservas</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 70rem; padding: 0 1rem; color: #1b2430; }
+    h1 { margin-bottom: .2rem; }
+    h2 { margin-top: 2rem; font-size: 1.1rem; }
+    .sub { color: #5b6674; margin-top: 0; }
+    table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+    th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid #dde2e8; }
+    th { background: #f1f4f8; }
+    .tag { display: inline-block; padding: .05rem .45rem; border-radius: .6rem; font-size: .8rem; background: #e3ecf7; }
+    .tag.vc { background: #fdebd2; }
+    .aviso { background: #fde8e8; border: 1px solid #f3b7b7; padding: .6rem .8rem; border-radius: .4rem; }
+    .vazio { color: #5b6674; font-style: italic; }
+    form { margin: 1rem 0; }
+    code { background: #f1f4f8; padding: .1rem .3rem; border-radius: .25rem; }
+  </style>
+</head>
+<body>
+  <h1>COSEG Mobilidade</h1>
+  <p class="sub">Painel de consulta das reservas de veículos do Porto do Itaqui</p>
+
+  <h2>Frota ({{ frota|length }} veículos)</h2>
+  <table>
+    <thead><tr><th>Código</th><th>Categoria</th><th>Capacidade</th></tr></thead>
+    <tbody>
+      {% for v in frota %}
+      <tr>
+        <td>{{ v.codigo }}</td>
+        <td><span class="tag {% if v.categoria.value == 'VC' %}vc{% endif %}">{{ v.categoria.value }}</span></td>
+        <td>{{ v.capacidade }} passageiros</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="3" class="vazio">Nenhum veículo cadastrado. Execute <code>python manage.py carregar_seed</code>.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Reservas{% if filtro %} em {{ filtro|date:"d/m/Y" }}{% endif %} ({{ reservas|length }})</h2>
+  <form method="get">
+    <label>Filtrar por data
+      <input type="date" name="data" value="{{ filtro|date:'Y-m-d' }}">
+    </label>
+    <button type="submit">Filtrar</button>
+    {% if filtro %}<a href="{% url 'painel' %}">limpar</a>{% endif %}
+  </form>
+  {% if aviso %}<p class="aviso">{{ aviso }}</p>{% endif %}
+
+  <table>
+    <thead>
+      <tr><th>Data</th><th>Veículo</th><th>Saída</th><th>Retorno</th><th>Atividade</th><th>Solicitante</th><th>Setor</th><th>Passageiros</th></tr>
+    </thead>
+    <tbody>
+      {% for r in reservas %}
+      <tr>
+        <td>{{ r.data|date:"d/m/Y" }}</td>
+        <td>{{ r.veiculo.codigo }}</td>
+        <td>{{ r.saida|time:"H:i" }}</td>
+        <td>{{ r.retorno|time:"H:i" }}</td>
+        <td>{{ r.atividade }}</td>
+        <td>{{ r.solicitante }}</td>
+        <td>{{ r.setor }}</td>
+        <td>{{ r.passageiros }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8" class="vazio">Nenhuma reserva encontrada.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Endpoints</h2>
+  <table>
+    <tbody>
+      <tr><td><code>GET</code></td><td><code>/api/veiculos/</code></td><td>Lista a frota</td></tr>
+      <tr><td><code>GET</code></td><td><code>/api/reservas/?data=AAAA-MM-DD</code></td><td>Lista reservas, com filtro opcional por data</td></tr>
+      <tr><td><code>POST</code></td><td><code>/api/reservas/</code></td><td>Cria reserva (201, 400 ou 409)</td></tr>
+      <tr><td><code>GET</code> <code>PUT</code> <code>DELETE</code></td><td><code>/api/reservas/&lt;id&gt;/</code></td><td>Consulta, altera ou cancela (404 se não existir)</td></tr>
+    </tbody>
+  </table>
+</body>
+</html>

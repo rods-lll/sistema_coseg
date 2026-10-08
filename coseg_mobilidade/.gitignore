@@ -1,0 +1,13 @@
+# Ambientes virtuais
+.venv/
+venv/
+
+# Python e Django
+__pycache__/
+*.pyc
+db.sqlite3
+.env
+
+# IDEs e editores
+.vscode/
+.idea/
