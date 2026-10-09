@@ -1,7 +1,7 @@
 import unittest
 from datetime import date, time, timedelta
 
-from core.domain.entidades import CategoriaVeiculo, Reserva, Veiculo
+from core.domain.entidades import CategoriaVeiculo, Reserva, StatusReserva, Veiculo
 from core.domain.excecoes import (
     CamposObrigatorios,
     CapacidadeExcedida,
@@ -64,6 +64,15 @@ class ConflitoTest(unittest.TestCase):
     def test_outra_data_nao_conflita(self):
         outra = reserva(data=AMANHA + timedelta(days=1))
         self.validador.validar(outra, [self.existente])
+
+    def test_reserva_cancelada_nao_ocupa_o_veiculo(self):
+        cancelada = reserva(time(8), time(10), id=1, status=StatusReserva.CANCELADA)
+        self.validador.validar(reserva(time(9), time(11)), [cancelada])
+
+    def test_reserva_concluida_continua_ocupando(self):
+        concluida = reserva(time(8), time(10), id=1, status=StatusReserva.CONCLUIDA)
+        with self.assertRaises(ConflitoDeHorario):
+            self.validador.validar(reserva(time(9), time(11)), [concluida])
 
     def test_edicao_ignora_a_propria_reserva(self):
         editada = reserva(time(8), time(11), id=1)

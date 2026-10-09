@@ -4,20 +4,28 @@ from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 
-from adapters.saida.persistencia.models import ReservaModel, VeiculoModel
+from adapters.saida.persistencia.models import (
+    ColaboradorModel,
+    ReservaModel,
+    SetorModel,
+    VeiculoModel,
+)
 from adapters.saida.persistencia.repositorios import (
     ReservaDjangoRepository,
     VeiculoDjangoRepository,
+    obter_ou_criar_colaborador,
 )
-from core.domain.entidades import CategoriaVeiculo, Reserva
+from core.domain.entidades import CategoriaVeiculo, Reserva, StatusReserva
 from core.domain.excecoes import (
     CamposObrigatorios,
     CapacidadeExcedida,
     ConflitoDeHorario,
     PeriodoInvalido,
     ReservaInvalida,
+    ReservaNaoEditavel,
     ReservaNaoEncontrada,
     SemVeiculoDisponivel,
+    VeiculoInativo,
 )
 from core.services.reserva_service import ReservaService
 
@@ -109,16 +117,18 @@ class PersistenciaECrudTest(BaseIntegracao):
             )
         self.assertEqual(self.service.obter(segunda.id).saida, time(11))
 
-    def test_excluir_remove_e_libera_o_horario(self):
+    def test_cancelar_mantem_historico_e_libera_o_horario(self):
         criada = self.service.criar(novo_pedido(), codigo_veiculo="VL-02")
-        self.service.excluir(criada.id)
-        with self.assertRaises(ReservaNaoEncontrada):
-            self.service.obter(criada.id)
+        self.service.cancelar(criada.id)
+        cancelada = self.service.obter(criada.id)
+        self.assertIs(cancelada.status, StatusReserva.CANCELADA)
+        self.assertIsNotNone(ReservaModel.objects.get(pk=criada.id).cancelada_em)
         self.service.criar(novo_pedido(), codigo_veiculo="VL-02")
+        self.assertEqual(ReservaModel.objects.count(), 6)
 
-    def test_excluir_inexistente(self):
+    def test_cancelar_inexistente(self):
         with self.assertRaises(ReservaNaoEncontrada):
-            self.service.excluir(9999)
+            self.service.cancelar(9999)
 
     def test_veiculo_fora_da_frota(self):
         with self.assertRaises(ReservaInvalida) as ctx:
@@ -128,8 +138,7 @@ class PersistenciaECrudTest(BaseIntegracao):
     def test_banco_recusa_retorno_anterior_a_saida(self):
         with self.assertRaises(IntegrityError), transaction.atomic():
             ReservaModel.objects.create(
-                solicitante="x",
-                setor="x",
+                colaborador=obter_ou_criar_colaborador("x", "x"),
                 atividade="x",
                 origem="x",
                 destino="x",
@@ -209,3 +218,93 @@ class AlocacaoPorCategoriaTest(BaseIntegracao):
         pedido = novo_pedido(passageiros=7, categoria=CategoriaVeiculo.LEVE)
         with self.assertRaises(CapacidadeExcedida):
             self.service.criar(pedido)
+
+
+class SetorEColaboradorTest(BaseIntegracao):
+    def test_reserva_cria_setor_e_colaborador(self):
+        criada = self.service.criar(novo_pedido(), codigo_veiculo="VL-02")
+        modelo = ReservaModel.objects.get(pk=criada.id)
+        self.assertEqual(modelo.colaborador.nome, "Maria Silva")
+        self.assertEqual(modelo.colaborador.setor.nome, "Operações")
+
+    def test_mesmo_solicitante_reaproveita_o_cadastro(self):
+        self.service.criar(novo_pedido(), codigo_veiculo="VL-02")
+        self.service.criar(
+            novo_pedido(solicitante="  maria   SILVA ", setor="operações"),
+            codigo_veiculo="VL-03",
+        )
+        self.assertEqual(ColaboradorModel.objects.filter(nome="Maria Silva").count(), 1)
+        self.assertEqual(SetorModel.objects.filter(nome="Operações").count(), 1)
+
+    def test_mesmo_nome_em_setores_diferentes_sao_pessoas_diferentes(self):
+        self.service.criar(novo_pedido(), codigo_veiculo="VL-02")
+        self.service.criar(novo_pedido(setor="Engenharia"), codigo_veiculo="VL-03")
+        self.assertEqual(ColaboradorModel.objects.filter(nome="Maria Silva").count(), 2)
+
+    def test_banco_recusa_colaborador_duplicado_no_setor(self):
+        setor = SetorModel.objects.create(nome="TI")
+        ColaboradorModel.objects.create(nome="Ana", setor=setor)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            ColaboradorModel.objects.create(nome="Ana", setor=setor)
+
+    def test_banco_recusa_zero_passageiros(self):
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            ReservaModel.objects.create(
+                colaborador=obter_ou_criar_colaborador("x", "x"),
+                atividade="x",
+                origem="x",
+                destino="x",
+                data=AMANHA,
+                saida=time(8),
+                retorno=time(9),
+                passageiros=0,
+                veiculo=VeiculoModel.objects.get(codigo="VL-01"),
+            )
+
+
+class StatusDaReservaTest(BaseIntegracao):
+    def test_nova_reserva_nasce_confirmada(self):
+        criada = self.service.criar(novo_pedido(), codigo_veiculo="VL-02")
+        self.assertIs(criada.status, StatusReserva.CONFIRMADA)
+
+    def test_cancelada_nao_pode_ser_alterada_nem_cancelada_de_novo(self):
+        criada = self.service.criar(novo_pedido(), codigo_veiculo="VL-02")
+        self.service.cancelar(criada.id)
+        with self.assertRaises(ReservaNaoEditavel):
+            self.service.atualizar(criada.id, novo_pedido(), codigo_veiculo="VL-02")
+        with self.assertRaises(ReservaNaoEditavel):
+            self.service.cancelar(criada.id)
+
+    def test_concluir(self):
+        criada = self.service.criar(novo_pedido(), codigo_veiculo="VL-02")
+        self.service.concluir(criada.id)
+        self.assertIs(self.service.obter(criada.id).status, StatusReserva.CONCLUIDA)
+        with self.assertRaises(ReservaNaoEditavel):
+            self.service.cancelar(criada.id)
+
+    def test_atualizar_mantem_status_confirmada(self):
+        criada = self.service.criar(novo_pedido(), codigo_veiculo="VL-02")
+        lida = self.service.atualizar(
+            criada.id, novo_pedido(destino="Terminal"), codigo_veiculo="VL-02"
+        )
+        self.assertIs(lida.status, StatusReserva.CONFIRMADA)
+
+
+class VeiculoInativoTest(BaseIntegracao):
+    def setUp(self):
+        super().setUp()
+        VeiculoModel.objects.filter(codigo="VL-01").update(ativo=False)
+
+    def test_veiculo_inativo_nao_pode_ser_reservado(self):
+        with self.assertRaises(VeiculoInativo):
+            self.service.criar(novo_pedido(), codigo_veiculo="VL-01")
+
+    def test_alocacao_por_categoria_pula_o_inativo(self):
+        criada = self.service.criar(novo_pedido(categoria=CategoriaVeiculo.LEVE))
+        self.assertEqual(criada.veiculo.codigo, "VL-02")
+
+    def test_frota_informa_placa_modelo_e_situacao(self):
+        VeiculoModel.objects.filter(codigo="VL-02").update(placa="ABC1D23", modelo="Hilux")
+        frota = {v.codigo: v for v in self.service.frota()}
+        self.assertFalse(frota["VL-01"].ativo)
+        self.assertEqual((frota["VL-02"].placa, frota["VL-02"].modelo), ("ABC1D23", "Hilux"))

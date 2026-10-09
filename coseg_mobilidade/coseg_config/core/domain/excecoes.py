@@ -46,3 +46,19 @@ class ReservaNaoEncontrada(Exception):
     def __init__(self, reserva_id):
         self.reserva_id = reserva_id
         super().__init__(f"Reserva {reserva_id} não encontrada.")
+
+
+class VeiculoInativo(ReservaInvalida):
+    def __init__(self, codigo):
+        super().__init__(
+            f"O veículo {codigo} está inativo (fora de operação) e não pode ser reservado.",
+            campo="veiculo",
+        )
+
+
+class ReservaNaoEditavel(ReservaInvalida):
+    def __init__(self, reserva_id, status):
+        super().__init__(
+            f"A reserva {reserva_id} está {status.rotulo} e não pode ser alterada.",
+            campo="status",
+        )

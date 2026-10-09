@@ -5,7 +5,7 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
-from adapters.saida.persistencia.models import ReservaModel
+from adapters.saida.persistencia.models import ReservaModel, VeiculoModel
 
 AMANHA = date.today() + timedelta(days=1)
 
@@ -51,6 +51,10 @@ class VeiculosEListagemTest(ApiTest):
         self.assertEqual(corpo["total"], 10)
         vc = [v for v in corpo["veiculos"] if v["categoria"] == "VC"]
         self.assertEqual([v["capacidade"] for v in vc], [18, 18])
+        self.assertEqual(
+            set(corpo["veiculos"][0]),
+            {"codigo", "categoria", "capacidade", "placa", "modelo", "ativo"},
+        )
 
     def test_lista_reservas_e_filtra_por_data(self):
         self.assertEqual(self.client.get(self.url).json()["total"], 4)
@@ -131,6 +135,15 @@ class CriacaoTest(ApiTest):
         self.assertEqual(self.enviar("post", self.url, "{quebrado").status_code, 400)
         self.assertEqual(self.enviar("post", self.url, [1, 2]).status_code, 400)
 
+    def test_resposta_traz_o_status(self):
+        self.assertEqual(self.criar().json()["reserva"]["status"], "CONFIRMADA")
+
+    def test_veiculo_inativo_retorna_400(self):
+        VeiculoModel.objects.filter(codigo="VL-02").update(ativo=False)
+        resposta = self.criar()
+        self.assertEqual(resposta.status_code, 400)
+        self.assertEqual(resposta.json()["codigo"], "VEICULO_INATIVO")
+
     def test_veiculo_inexistente(self):
         resposta = self.criar(veiculo="VL-99")
         self.assertEqual(resposta.status_code, 400)
@@ -168,12 +181,26 @@ class DetalheTest(ApiTest):
         )
         self.assertEqual(resposta.status_code, 409)
 
-    def test_cancelamento_libera_o_horario(self):
+    def test_cancelamento_libera_o_horario_e_mantem_historico(self):
         resposta = self.client.delete(self.url_detalhe)
         self.assertEqual(resposta.status_code, 200)
         self.assertIn("cancelada", resposta.json()["mensagem"])
-        self.assertEqual(self.client.get(self.url_detalhe).status_code, 404)
+        consulta = self.client.get(self.url_detalhe)
+        self.assertEqual(consulta.status_code, 200)
+        self.assertEqual(consulta.json()["reserva"]["status"], "CANCELADA")
         self.assertEqual(self.criar().status_code, 201)
+
+    def test_cancelar_duas_vezes_retorna_409(self):
+        self.client.delete(self.url_detalhe)
+        resposta = self.client.delete(self.url_detalhe)
+        self.assertEqual(resposta.status_code, 409)
+        self.assertEqual(resposta.json()["codigo"], "RESERVA_NAO_EDITAVEL")
+
+    def test_alterar_reserva_cancelada_retorna_409(self):
+        self.client.delete(self.url_detalhe)
+        resposta = self.enviar("put", self.url_detalhe, payload(destino="Terminal"))
+        self.assertEqual(resposta.status_code, 409)
+        self.assertEqual(resposta.json()["campo"], "status")
 
     def test_reserva_inexistente_retorna_404(self):
         url = reverse("api-reserva", args=[99999])

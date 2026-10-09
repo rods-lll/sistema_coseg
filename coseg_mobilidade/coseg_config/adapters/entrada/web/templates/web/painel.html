@@ -14,6 +14,10 @@
     th { background: #f1f4f8; }
     .tag { display: inline-block; padding: .05rem .45rem; border-radius: .6rem; font-size: .8rem; background: #e3ecf7; }
     .tag.vc { background: #fdebd2; }
+    .tag.cancelada { background: #fde8e8; }
+    .tag.concluida { background: #e6e8eb; }
+    .tag.confirmada { background: #dff5e6; }
+    tr.inativo td, tr.cancelada td { color: #8a929c; }
     .aviso { background: #fde8e8; border: 1px solid #f3b7b7; padding: .6rem .8rem; border-radius: .4rem; }
     .vazio { color: #5b6674; font-style: italic; }
     form { margin: 1rem 0; }
@@ -26,16 +30,19 @@
 
   <h2>Frota ({{ frota|length }} veículos)</h2>
   <table>
-    <thead><tr><th>Código</th><th>Categoria</th><th>Capacidade</th></tr></thead>
+    <thead><tr><th>Código</th><th>Categoria</th><th>Capacidade</th><th>Placa</th><th>Modelo</th><th>Situação</th></tr></thead>
     <tbody>
       {% for v in frota %}
-      <tr>
+      <tr{% if not v.ativo %} class="inativo"{% endif %}>
         <td>{{ v.codigo }}</td>
         <td><span class="tag {% if v.categoria.value == 'VC' %}vc{% endif %}">{{ v.categoria.value }}</span></td>
         <td>{{ v.capacidade }} passageiros</td>
+        <td>{{ v.placa|default:"—" }}</td>
+        <td>{{ v.modelo|default:"—" }}</td>
+        <td>{% if v.ativo %}Ativo{% else %}Inativo{% endif %}</td>
       </tr>
       {% empty %}
-      <tr><td colspan="3" class="vazio">Nenhum veículo cadastrado. Execute <code>python manage.py carregar_seed</code>.</td></tr>
+      <tr><td colspan="6" class="vazio">Nenhum veículo cadastrado. Execute <code>python manage.py carregar_seed</code>.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -52,11 +59,11 @@
 
   <table>
     <thead>
-      <tr><th>Data</th><th>Veículo</th><th>Saída</th><th>Retorno</th><th>Atividade</th><th>Solicitante</th><th>Setor</th><th>Passageiros</th></tr>
+      <tr><th>Data</th><th>Veículo</th><th>Saída</th><th>Retorno</th><th>Atividade</th><th>Solicitante</th><th>Setor</th><th>Passageiros</th><th>Status</th></tr>
     </thead>
     <tbody>
       {% for r in reservas %}
-      <tr>
+      <tr{% if r.status.value == 'CANCELADA' %} class="cancelada"{% endif %}>
         <td>{{ r.data|date:"d/m/Y" }}</td>
         <td>{{ r.veiculo.codigo }}</td>
         <td>{{ r.saida|time:"H:i" }}</td>
@@ -65,9 +72,10 @@
         <td>{{ r.solicitante }}</td>
         <td>{{ r.setor }}</td>
         <td>{{ r.passageiros }}</td>
+        <td><span class="tag {{ r.status.value|lower }}">{{ r.status.rotulo|capfirst }}</span></td>
       </tr>
       {% empty %}
-      <tr><td colspan="8" class="vazio">Nenhuma reserva encontrada.</td></tr>
+      <tr><td colspan="9" class="vazio">Nenhuma reserva encontrada.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -78,7 +86,7 @@
       <tr><td><code>GET</code></td><td><code>/api/veiculos/</code></td><td>Lista a frota</td></tr>
       <tr><td><code>GET</code></td><td><code>/api/reservas/?data=AAAA-MM-DD</code></td><td>Lista reservas, com filtro opcional por data</td></tr>
       <tr><td><code>POST</code></td><td><code>/api/reservas/</code></td><td>Cria reserva (201, 400 ou 409)</td></tr>
-      <tr><td><code>GET</code> <code>PUT</code> <code>DELETE</code></td><td><code>/api/reservas/&lt;id&gt;/</code></td><td>Consulta, altera ou cancela (404 se não existir)</td></tr>
+      <tr><td><code>GET</code> <code>PUT</code> <code>DELETE</code></td><td><code>/api/reservas/&lt;id&gt;/</code></td><td>Consulta, altera ou cancela sem apagar (404 se não existir)</td></tr>
     </tbody>
   </table>
 </body>

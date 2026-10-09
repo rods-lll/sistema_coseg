@@ -12,8 +12,10 @@ from core.domain.excecoes import (
     ConflitoDeHorario,
     PeriodoInvalido,
     ReservaInvalida,
+    ReservaNaoEditavel,
     ReservaNaoEncontrada,
     SemVeiculoDisponivel,
+    VeiculoInativo,
 )
 
 from .composicao import montar_service
@@ -28,6 +30,8 @@ from .serializacao import (
 ERROS_DE_DOMINIO = [
     (ConflitoDeHorario, 409, "CONFLITO_DE_HORARIO"),
     (SemVeiculoDisponivel, 409, "SEM_VEICULO_DISPONIVEL"),
+    (ReservaNaoEditavel, 409, "RESERVA_NAO_EDITAVEL"),
+    (VeiculoInativo, 400, "VEICULO_INATIVO"),
     (CamposObrigatorios, 400, "CAMPOS_OBRIGATORIOS"),
     (CapacidadeExcedida, 400, "CAPACIDADE_EXCEDIDA"),
     (PeriodoInvalido, 400, "PERIODO_INVALIDO"),
@@ -129,7 +133,7 @@ def reserva_detalhe(request, reserva_id):
 
     if request.method == "DELETE":
         with transaction.atomic():
-            service.excluir(reserva_id)
+            service.cancelar(reserva_id)
         return JsonResponse(
             {"sucesso": True, "mensagem": f"Reserva {reserva_id} cancelada com sucesso."}
         )

@@ -4,6 +4,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from adapters.saida.persistencia.models import ReservaModel, VeiculoModel
+from adapters.saida.persistencia.repositorios import obter_ou_criar_colaborador
 
 FROTA = [(f"VL-{n:02d}", "VL") for n in range(1, 9)] + [
     (f"VC-{n:02d}", "VC") for n in range(1, 3)
@@ -29,6 +30,7 @@ class Command(BaseCommand):
                 codigo=codigo, defaults={"categoria": categoria}
             )
 
+        coseg = obter_ou_criar_colaborador("Carga inicial COSEG", "COSEG")
         criadas = 0
         for codigo, data, saida, retorno, atividade, passageiros in RESERVAS_INICIAIS:
             # Grava pelo ORM, sem o ReservaService: as datas de agosto/2026
@@ -39,8 +41,7 @@ class Command(BaseCommand):
                 saida=saida,
                 retorno=retorno,
                 defaults={
-                    "solicitante": "Carga inicial COSEG",
-                    "setor": "COSEG",
+                    "colaborador": coseg,
                     "atividade": atividade,
                     "origem": "Porto do Itaqui",
                     "destino": "A definir",

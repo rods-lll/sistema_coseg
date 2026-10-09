@@ -1,0 +1,59 @@
+digraph DER {
+  graph [rankdir=LR, bgcolor="#FAFAF7", pad=0.4, nodesep=0.6, ranksep=1.1, fontname="Helvetica"];
+  node  [shape=plain, fontname="Helvetica", fontsize=12];
+  edge  [color="#121412", fontname="Helvetica", fontsize=11, arrowhead=crow, arrowtail=tee, dir=both];
+
+  setor [label=<
+  <table border="1" cellborder="0" cellspacing="0" cellpadding="6" bgcolor="#FFFFFF" color="#121412">
+    <tr><td bgcolor="#121412" align="left"><font color="#7CF0A8"><b>SetorModel</b></font></td></tr>
+    <tr><td align="left"><b>id</b> PK</td></tr>
+    <tr><td align="left">nome  <i>único</i></td></tr>
+    <tr><td align="left"><font color="#6B706A">criado_em · atualizado_em</font></td></tr>
+  </table>>];
+
+  colaborador [label=<
+  <table border="1" cellborder="0" cellspacing="0" cellpadding="6" bgcolor="#FFFFFF" color="#121412">
+    <tr><td bgcolor="#121412" align="left"><font color="#7CF0A8"><b>ColaboradorModel</b></font></td></tr>
+    <tr><td align="left"><b>id</b> PK</td></tr>
+    <tr><td align="left">nome</td></tr>
+    <tr><td align="left">setor_id  FK</td></tr>
+    <tr><td align="left">email · telefone</td></tr>
+    <tr><td align="left"><font color="#1B4D33"><i>único: (nome, setor)</i></font></td></tr>
+    <tr><td align="left"><font color="#6B706A">criado_em · atualizado_em</font></td></tr>
+  </table>>];
+
+  veiculo [label=<
+  <table border="1" cellborder="0" cellspacing="0" cellpadding="6" bgcolor="#FFFFFF" color="#121412">
+    <tr><td bgcolor="#121412" align="left"><font color="#7CF0A8"><b>VeiculoModel</b></font></td></tr>
+    <tr><td align="left"><b>id</b> PK</td></tr>
+    <tr><td align="left">codigo  <i>único</i></td></tr>
+    <tr><td align="left">categoria  VL | VC</td></tr>
+    <tr><td align="left">placa  <i>única</i> · modelo</td></tr>
+    <tr><td align="left">ativo</td></tr>
+    <tr><td align="left"><font color="#6B706A">criado_em · atualizado_em</font></td></tr>
+  </table>>];
+
+  reserva [label=<
+  <table border="1" cellborder="0" cellspacing="0" cellpadding="6" bgcolor="#FFFFFF" color="#121412">
+    <tr><td bgcolor="#7CF0A8" align="left"><b>ReservaModel</b></td></tr>
+    <tr><td align="left"><b>id</b> PK</td></tr>
+    <tr><td align="left">colaborador_id  FK</td></tr>
+    <tr><td align="left">veiculo_id  FK (PROTECT)</td></tr>
+    <tr><td align="left">atividade · origem · destino</td></tr>
+    <tr><td align="left">data · saida · retorno</td></tr>
+    <tr><td align="left">passageiros</td></tr>
+    <tr><td align="left">categoria_pretendida · observacoes</td></tr>
+    <tr><td align="left">status  CONFIRMADA | CANCELADA | CONCLUIDA</td></tr>
+    <tr><td align="left">cancelada_em</td></tr>
+    <tr><td align="left"><font color="#6B706A">criada_em · atualizada_em</font></td></tr>
+    <tr><td align="left"><font color="#1B4D33"><i>CHECK retorno &gt; saida</i></font></td></tr>
+    <tr><td align="left"><font color="#1B4D33"><i>CHECK passageiros &gt;= 1</i></font></td></tr>
+    <tr><td align="left"><font color="#1B4D33"><i>CHECK status válido</i></font></td></tr>
+    <tr><td align="left"><font color="#1B4D33"><i>INDEX (veiculo, data)</i></font></td></tr>
+  </table>>];
+
+  setor -> colaborador [label="  1 : N  "];
+  colaborador -> reserva [label="  1 : N  "];
+  veiculo -> reserva [label="  1 : N  "];
+  {rank=same; colaborador; veiculo}
+}

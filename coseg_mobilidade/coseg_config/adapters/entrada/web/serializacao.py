@@ -9,6 +9,9 @@ def veiculo_para_dict(veiculo):
         "codigo": veiculo.codigo,
         "categoria": veiculo.categoria.value,
         "capacidade": veiculo.capacidade,
+        "placa": veiculo.placa,
+        "modelo": veiculo.modelo,
+        "ativo": veiculo.ativo,
     }
 
 
@@ -27,6 +30,7 @@ def reserva_para_dict(reserva):
         "veiculo": reserva.veiculo.codigo if reserva.veiculo else None,
         "categoria": reserva.categoria.value if reserva.categoria else None,
         "observacoes": reserva.observacoes,
+        "status": reserva.status.value,
     }
 
 

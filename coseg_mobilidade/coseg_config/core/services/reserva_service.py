@@ -1,10 +1,13 @@
 from dataclasses import replace
 from datetime import date
 
+from core.domain.entidades import StatusReserva
 from core.domain.excecoes import (
     ReservaInvalida,
+    ReservaNaoEditavel,
     ReservaNaoEncontrada,
     SemVeiculoDisponivel,
+    VeiculoInativo,
 )
 from core.domain.validadores import (
     ValidadorCampos,
@@ -35,19 +38,39 @@ class ReservaService:
             raise ReservaNaoEncontrada(reserva_id)
         return reserva
 
+    def validar(self, reserva, codigo_veiculo=None):
+        """Aplica todas as regras sem gravar (usado pelo Django Admin)."""
+        self._preparar(reserva, codigo_veiculo)
+        return reserva
+
     def criar(self, reserva, codigo_veiculo=None):
         self._preparar(reserva, codigo_veiculo)
         return self._reservas.salvar(reserva)
 
     def atualizar(self, reserva_id, reserva, codigo_veiculo=None):
-        self.obter(reserva_id)
+        atual = self._obter_confirmada(reserva_id)
         reserva.id = reserva_id
+        reserva.status = atual.status
         self._preparar(reserva, codigo_veiculo)
         return self._reservas.salvar(reserva)
 
-    def excluir(self, reserva_id):
-        if not self._reservas.excluir(reserva_id):
-            raise ReservaNaoEncontrada(reserva_id)
+    def cancelar(self, reserva_id):
+        """Cancela sem apagar: a reserva fica no histórico e libera o horário."""
+        return self._mudar_status(reserva_id, StatusReserva.CANCELADA)
+
+    def concluir(self, reserva_id):
+        return self._mudar_status(reserva_id, StatusReserva.CONCLUIDA)
+
+    def _mudar_status(self, reserva_id, novo_status):
+        reserva = self._obter_confirmada(reserva_id)
+        reserva.status = novo_status
+        return self._reservas.salvar(reserva)
+
+    def _obter_confirmada(self, reserva_id):
+        reserva = self.obter(reserva_id)
+        if reserva.status is not StatusReserva.CONFIRMADA:
+            raise ReservaNaoEditavel(reserva_id, reserva.status)
+        return reserva
 
     def _preparar(self, reserva, codigo_veiculo):
         if codigo_veiculo:
@@ -69,10 +92,14 @@ class ReservaService:
             raise ReservaInvalida(
                 f"O veículo {codigo} não está cadastrado na frota.", campo="veiculo"
             )
+        if not veiculo.ativo:
+            raise VeiculoInativo(codigo)
         return veiculo
 
     def _alocar(self, reserva):
         for candidato in self._veiculos.listar_por_categoria(reserva.categoria):
+            if not candidato.ativo:
+                continue
             existentes = self._reservas.listar_do_veiculo_na_data(
                 candidato.codigo, reserva.data
             )
