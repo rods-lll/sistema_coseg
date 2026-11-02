@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from adapters.saida.persistencia.models import (
     ColaboradorModel,
+    MotoristaModel,
     ReservaModel,
     SetorModel,
     VeiculoModel,
@@ -55,6 +56,30 @@ class ColaboradorAdmin(admin.ModelAdmin):
         return obj.total
 
 
+@admin.register(MotoristaModel)
+class MotoristaAdmin(admin.ModelAdmin):
+    list_display = (
+        "nome", "matricula", "cnh_categoria", "cnh_validade", "situacao_cnh", "telefone", "ativo",
+    )
+    list_editable = ("ativo",)
+    list_filter = ("cnh_categoria", "ativo")
+    search_fields = ("nome", "matricula", "cnh_numero", "telefone")
+    readonly_fields = ("criado_em", "atualizado_em")
+
+    @admin.display(description="CNH")
+    def situacao_cnh(self, obj):
+        dias = (obj.cnh_validade - timezone.localdate()).days
+        if dias < 0:
+            return "Vencida"
+        if dias <= 30:
+            return f"Vence em {dias} dia(s)"
+        return "Válida"
+
+    def has_delete_permission(self, request, obj=None):
+        # Motorista com reservas fica no histórico: desative em vez de apagar.
+        return not (obj and obj.reservas.exists())
+
+
 class VeiculoAdminForm(forms.ModelForm):
     class Meta:
         model = VeiculoModel
@@ -95,6 +120,7 @@ class ReservaAdminForm(forms.ModelForm):
             "passageiros",
             "veiculo",
             "categoria_pretendida",
+            "motorista",
             "observacoes",
             "status",
         )
@@ -112,6 +138,10 @@ class ReservaAdminForm(forms.ModelForm):
         self.fields["veiculo"].help_text = (
             "Deixe vazio e escolha a categoria para o sistema alocar "
             "o primeiro veículo livre."
+        )
+        self.fields["motorista"].help_text = (
+            "Deixe vazio para o sistema escalar automaticamente um motorista com a CNH "
+            "certa e livre no horário. Preencha só para trocar a escala à mão."
         )
 
     def clean(self):
@@ -144,7 +174,12 @@ class ReservaAdminForm(forms.ModelForm):
         )
 
         try:
-            montar_service().validar(reserva, veiculo.codigo if veiculo else None)
+            motorista = dados.get("motorista")
+            montar_service().validar(
+                reserva,
+                veiculo.codigo if veiculo else None,
+                motorista.matricula if motorista else None,
+            )
         except CamposObrigatorios as exc:
             for campo in exc.campos:
                 self.add_error(CAMPO_NO_FORM.get(campo, campo), "Campo obrigatório.")
@@ -155,6 +190,9 @@ class ReservaAdminForm(forms.ModelForm):
             if veiculo is None:
                 # Pedido só por categoria: grava o veículo que o service alocou.
                 dados["veiculo"] = VeiculoModel.objects.get(codigo=reserva.veiculo.codigo)
+            if motorista is None and reserva.motorista is not None:
+                # Escala automática: grava o motorista que o service escolheu.
+                dados["motorista"] = MotoristaModel.objects.get(matricula=reserva.motorista.matricula)
         return dados
 
 
@@ -169,10 +207,11 @@ class ReservaAdmin(admin.ModelAdmin):
         "atividade",
         "colaborador",
         "setor",
+        "motorista",
         "passageiros",
         "status",
     )
-    list_filter = ("status", "data", "veiculo__categoria", "veiculo", "colaborador__setor")
+    list_filter = ("status", "data", "veiculo__categoria", "veiculo", "motorista", "colaborador__setor")
     search_fields = (
         "colaborador__nome",
         "colaborador__setor__nome",
@@ -181,7 +220,7 @@ class ReservaAdmin(admin.ModelAdmin):
         "destino",
     )
     date_hierarchy = "data"
-    list_select_related = ("veiculo", "colaborador__setor")
+    list_select_related = ("veiculo", "colaborador__setor", "motorista")
     autocomplete_fields = ("colaborador",)
     readonly_fields = ("cancelada_em", "criada_em", "atualizada_em")
     actions = ("cancelar_reservas", "concluir_reservas")

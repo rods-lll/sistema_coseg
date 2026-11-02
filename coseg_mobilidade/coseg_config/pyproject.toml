@@ -1,0 +1,15 @@
+[project]
+name = "coseg-mobilidade"
+version = "2.0.0"
+description = "Reserva de veículos do Porto do Itaqui (PBL 1 + PBL 2)"
+requires-python = ">=3.12"
+dependencies = [
+    "Django>=5.2,<6.0",
+    "psycopg[binary]>=3.2",
+]
+
+[tool.vercel]
+entrypoint = "config.wsgi:application"
+
+[tool.vercel.scripts]
+build = "python build.py"

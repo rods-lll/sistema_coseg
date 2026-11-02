@@ -3,6 +3,7 @@ from datetime import date, time, timedelta
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.test import TestCase
+from django.utils import timezone
 
 from adapters.saida.persistencia.models import (
     ColaboradorModel,
@@ -29,7 +30,7 @@ from core.domain.excecoes import (
 )
 from core.services.reserva_service import ReservaService
 
-AMANHA = date.today() + timedelta(days=1)
+AMANHA = timezone.localdate() + timedelta(days=1)
 
 
 def novo_pedido(saida=time(8), retorno=time(10), passageiros=3, **extra):
@@ -168,7 +169,7 @@ class RegrasNoServidorTest(BaseIntegracao):
             )
 
     def test_data_passada_e_rejeitada(self):
-        ontem = date.today() - timedelta(days=1)
+        ontem = timezone.localdate() - timedelta(days=1)
         with self.assertRaises(PeriodoInvalido):
             self.service.criar(novo_pedido(data=ontem), codigo_veiculo="VL-02")
         self.assertNadaPersistido()

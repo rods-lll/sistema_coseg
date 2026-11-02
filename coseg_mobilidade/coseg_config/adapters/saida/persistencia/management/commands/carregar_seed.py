@@ -3,11 +3,21 @@ from datetime import date, time
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from adapters.saida.persistencia.models import ReservaModel, VeiculoModel
+from adapters.saida.persistencia.models import MotoristaModel, ReservaModel, VeiculoModel
 from adapters.saida.persistencia.repositorios import obter_ou_criar_colaborador
 
 FROTA = [(f"VL-{n:02d}", "VL") for n in range(1, 9)] + [
     (f"VC-{n:02d}", "VC") for n in range(1, 3)
+]
+
+# Motoristas FICTÍCIOS, só para demonstração (o enunciado não traz motoristas).
+# (matrícula, nome, categoria da CNH, validade da CNH, telefone)
+MOTORISTAS = [
+    ("MOT-001", "Antônio Ferreira", "D", date(2028, 5, 10), "(98) 90000-0001"),
+    ("MOT-002", "Beatriz Lopes", "B", date(2027, 11, 30), "(98) 90000-0002"),
+    ("MOT-003", "Carlos Nunes", "E", date(2029, 2, 14), "(98) 90000-0003"),
+    ("MOT-004", "Daniela Costa", "B", date(2026, 12, 20), "(98) 90000-0004"),
+    ("MOT-005", "Edson Ribeiro", "D", date(2027, 8, 1), "(98) 90000-0005"),
 ]
 
 # (veículo, data, saída, retorno, atividade, passageiros)
@@ -28,6 +38,17 @@ class Command(BaseCommand):
         for codigo, categoria in FROTA:
             veiculos[codigo], _ = VeiculoModel.objects.update_or_create(
                 codigo=codigo, defaults={"categoria": categoria}
+            )
+
+        for matricula, nome, categoria, validade, telefone in MOTORISTAS:
+            MotoristaModel.objects.get_or_create(
+                matricula=matricula,
+                defaults={
+                    "nome": nome,
+                    "cnh_categoria": categoria,
+                    "cnh_validade": validade,
+                    "telefone": telefone,
+                },
             )
 
         coseg = obter_ou_criar_colaborador("Carga inicial COSEG", "COSEG")
@@ -53,7 +74,8 @@ class Command(BaseCommand):
         if options["verbosity"] > 0:
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"Frota: {len(FROTA)} veículos. Reservas novas: {criadas} "
+                    f"Frota: {len(FROTA)} veículos. Motoristas: {len(MOTORISTAS)}. "
+                    f"Reservas novas: {criadas} "
                     f"de {len(RESERVAS_INICIAIS)}."
                 )
             )

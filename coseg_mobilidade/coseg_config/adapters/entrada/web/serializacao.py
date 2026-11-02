@@ -1,5 +1,7 @@
 from datetime import date, time
 
+from django.utils import timezone
+
 from core.domain.entidades import CategoriaVeiculo, Reserva
 from core.domain.excecoes import ReservaInvalida
 
@@ -12,6 +14,19 @@ def veiculo_para_dict(veiculo):
         "placa": veiculo.placa,
         "modelo": veiculo.modelo,
         "ativo": veiculo.ativo,
+    }
+
+
+def motorista_para_dict(motorista, hoje=None):
+    return {
+        "matricula": motorista.matricula,
+        "nome": motorista.nome,
+        "telefone": motorista.telefone,
+        "cnh_categoria": motorista.categoria_cnh.value,
+        "cnh_validade": motorista.validade_cnh.isoformat(),
+        "cnh_valida": motorista.cnh_valida_em(hoje or timezone.localdate()),
+        "dirige": [c.value for c in CategoriaVeiculo if motorista.pode_dirigir(c)],
+        "ativo": motorista.ativo,
     }
 
 
@@ -31,6 +46,8 @@ def reserva_para_dict(reserva):
         "categoria": reserva.categoria.value if reserva.categoria else None,
         "observacoes": reserva.observacoes,
         "status": reserva.status.value,
+        "motorista": reserva.motorista.matricula if reserva.motorista else None,
+        "motorista_nome": reserva.motorista.nome if reserva.motorista else None,
     }
 
 
@@ -53,6 +70,34 @@ def _converter(valor, campo, conversor, formato):
 
 def ler_data(valor, campo="data"):
     return _converter(valor, campo, date.fromisoformat, "AAAA-MM-DD")
+
+
+def ler_hora(valor, campo):
+    return _converter(valor, campo, time.fromisoformat, "HH:MM")
+
+
+def ler_inteiro(valor, campo):
+    return _converter(valor, campo, _inteiro, "um número inteiro")
+
+
+def ler_categoria(valor):
+    return _converter(valor, "categoria", lambda v: CategoriaVeiculo(str(v).upper()), "VL ou VC")
+
+
+def situacao_para_dict(situacao, chave, extra=None):
+    corpo = {
+        chave: getattr(situacao.item, "codigo", None) or situacao.item.matricula,
+        "livre": situacao.livre,
+        "motivo": situacao.motivo,
+        "conflito": (
+            {"reserva_id": situacao.conflito.id,
+             "saida": situacao.conflito.saida.strftime("%H:%M"),
+             "retorno": situacao.conflito.retorno.strftime("%H:%M")}
+            if situacao.conflito else None
+        ),
+    }
+    corpo.update(extra or {})
+    return corpo
 
 
 def _texto(valor):
@@ -84,4 +129,8 @@ def reserva_do_payload(payload):
         ),
         observacoes=_texto(payload.get("observacoes")) or "",
     )
-    return reserva, _texto(payload.get("veiculo")) or None
+    return (
+        reserva,
+        _texto(payload.get("veiculo")) or None,
+        _texto(payload.get("motorista")) or None,
+    )

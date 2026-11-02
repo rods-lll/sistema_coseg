@@ -11,3 +11,8 @@ db.sqlite3
 # IDEs e editores
 .vscode/
 .idea/
+
+# Gerados no build / pela Vercel
+staticfiles/
+.vercel/
+.env*.local

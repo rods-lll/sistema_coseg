@@ -4,11 +4,12 @@ from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from adapters.saida.persistencia.models import ReservaModel, VeiculoModel
 from adapters.saida.persistencia.repositorios import obter_ou_criar_colaborador
 
-AMANHA = date.today() + timedelta(days=1)
+AMANHA = timezone.localdate() + timedelta(days=1)
 
 
 class AdminTest(TestCase):

@@ -4,10 +4,11 @@ from datetime import date, timedelta
 from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from adapters.saida.persistencia.models import ReservaModel, VeiculoModel
 
-AMANHA = date.today() + timedelta(days=1)
+AMANHA = timezone.localdate() + timedelta(days=1)
 
 
 def payload(**extra):
@@ -103,7 +104,7 @@ class CriacaoTest(ApiTest):
         self.assertEqual(resposta.json()["codigo"], "CAPACIDADE_EXCEDIDA")
 
     def test_data_passada(self):
-        ontem = (date.today() - timedelta(days=1)).isoformat()
+        ontem = (timezone.localdate() - timedelta(days=1)).isoformat()
         resposta = self.criar(data=ontem)
         self.assertEqual(resposta.status_code, 400)
         self.assertEqual(resposta.json()["codigo"], "PERIODO_INVALIDO")
@@ -230,5 +231,29 @@ class PainelTest(ApiTest):
         self.assertEqual(resposta.status_code, 200)
         self.assertContains(resposta, "AAAA-MM-DD")
 
-    def test_raiz_redireciona_para_o_painel(self):
-        self.assertRedirects(self.client.get("/"), reverse("painel"))
+    def test_raiz_serve_a_interface_web(self):
+        resposta = self.client.get("/")
+        self.assertEqual(resposta.status_code, 200)
+        self.assertContains(resposta, 'id="app"')
+        self.assertContains(resposta, "web/js/main.js")
+
+    def test_respostas_da_api_nao_ficam_em_cache(self):
+        for rota in ("/api/veiculos/", "/api/reservas/", "/api/reservas/999/"):
+            with self.subTest(rota=rota):
+                self.assertEqual(self.client.get(rota)["Cache-Control"], "no-store")
+
+
+class ColaboradoresTest(ApiTest):
+    def test_lista_colaboradores_e_setores(self):
+        self.criar()
+        self.criar(solicitante="João Lima", setor="Engenharia", saida="12:00", retorno="13:00")
+        corpo = self.client.get(reverse("api-colaboradores")).json()
+        nomes = [c["nome"] for c in corpo["colaboradores"]]
+        self.assertIn("Maria Silva", nomes)
+        self.assertIn("João Lima", nomes)
+        self.assertEqual(corpo["setores"], ["COSEG", "Engenharia", "Operações"])
+
+    def test_filtra_por_setor(self):
+        self.criar()
+        corpo = self.client.get(reverse("api-colaboradores"), {"setor": "operações"}).json()
+        self.assertEqual([c["nome"] for c in corpo["colaboradores"]], ["Maria Silva"])

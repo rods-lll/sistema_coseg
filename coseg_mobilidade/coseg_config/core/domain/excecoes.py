@@ -62,3 +62,55 @@ class ReservaNaoEditavel(ReservaInvalida):
             f"A reserva {reserva_id} está {status.rotulo} e não pode ser alterada.",
             campo="status",
         )
+
+
+class MotoristaInativo(ReservaInvalida):
+    def __init__(self, motorista):
+        super().__init__(
+            f"{motorista.nome} está inativo(a) e não pode ser escalado(a).",
+            campo="motorista",
+        )
+
+
+class MotoristaNaoHabilitado(ReservaInvalida):
+    def __init__(self, motorista, categoria_veiculo):
+        from core.domain.entidades import CategoriaCnh
+
+        super().__init__(
+            f"{motorista.nome} tem CNH categoria {motorista.categoria_cnh.value} e não pode "
+            f"dirigir veículo {categoria_veiculo.value} (exige "
+            f"{CategoriaCnh.exigida(categoria_veiculo)}).",
+            campo="motorista",
+        )
+
+
+class CnhVencida(ReservaInvalida):
+    def __init__(self, motorista, data):
+        super().__init__(
+            f"A CNH de {motorista.nome} vence em {motorista.validade_cnh:%d/%m/%Y} e não "
+            f"vale para {data:%d/%m/%Y}.",
+            campo="motorista",
+        )
+
+
+class ConflitoDeMotorista(ReservaInvalida):
+    def __init__(self, reserva_existente):
+        self.reserva_existente = reserva_existente
+        m = reserva_existente.motorista
+        super().__init__(
+            f"{m.nome} já está escalado(a) em {reserva_existente.data:%d/%m/%Y} das "
+            f"{reserva_existente.saida:%H:%M} às {reserva_existente.retorno:%H:%M} "
+            f"({reserva_existente.veiculo.codigo}).",
+            campo="motorista",
+        )
+
+
+class SemMotoristaDisponivel(ReservaInvalida):
+    def __init__(self, categoria_veiculo, data, saida, retorno):
+        from core.domain.entidades import CategoriaCnh
+
+        super().__init__(
+            f"Nenhum motorista com CNH {CategoriaCnh.exigida(categoria_veiculo)} está livre em "
+            f"{data:%d/%m/%Y} das {saida:%H:%M} às {retorno:%H:%M}.",
+            campo="motorista",
+        )

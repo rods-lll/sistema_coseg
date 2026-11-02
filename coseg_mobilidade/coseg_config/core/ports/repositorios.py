@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Protocol
 
-from core.domain.entidades import CategoriaVeiculo, Reserva, Veiculo
+from core.domain.entidades import CategoriaVeiculo, Colaborador, Motorista, Reserva, Veiculo
 
 
 class VeiculoRepository(Protocol):
@@ -19,6 +19,18 @@ class ReservaRepository(Protocol):
 
     def listar_do_veiculo_na_data(self, codigo: str, data: date) -> list[Reserva]: ...
 
+    def listar_do_motorista_na_data(self, matricula: str, data: date) -> list[Reserva]: ...
+
     def obter(self, reserva_id: int) -> Reserva | None: ...
 
     def salvar(self, reserva: Reserva) -> Reserva: ...
+
+
+class ColaboradorRepository(Protocol):
+    def listar(self, setor: str | None = None) -> list[Colaborador]: ...
+
+
+class MotoristaRepository(Protocol):
+    def listar(self) -> list[Motorista]: ...
+
+    def obter(self, matricula: str) -> Motorista | None: ...
